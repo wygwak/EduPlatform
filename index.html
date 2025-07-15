@@ -3,39 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>수강신청 시스템 데모</title>
+    <title>수강신청 시스템 (달력 포함)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        /* Noto Sans KR 폰트 적용 */
         body {
             font-family: 'Noto Sans KR', sans-serif;
         }
         /* 스크롤바 디자인 */
-        ::-webkit-scrollbar {
-            width: 8px;
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        
+        /* 달력 스타일 */
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+        .calendar-day { aspect-ratio: 1 / 1; }
+
+        /* 모달 스타일 */
+        .modal-overlay {
+            transition: opacity 0.3s ease;
         }
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
+        .modal-container {
+            transition: transform 0.3s ease, opacity 0.3s ease;
         }
-        ::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #555;
-        }
-        /* 토스트 메시지 애니메이션 */
-        .toast {
-            visibility: hidden;
+        .hidden .modal-overlay {
             opacity: 0;
-            transition: opacity 0.5s, transform 0.5s;
-            transform: translateY(20px);
         }
-        .toast.show {
-            visibility: visible;
-            opacity: 1;
-            transform: translateY(0);
+        .hidden .modal-container {
+            opacity: 0;
+            transform: scale(0.95);
         }
     </style>
 </head>
@@ -45,50 +42,74 @@
         <!-- 헤더 -->
         <header class="text-center mb-8">
             <h1 class="text-3xl md:text-4xl font-bold text-blue-600">수강신청 시스템</h1>
-            <p class="text-gray-600 mt-2">원하는 강의를 신청해보세요. (데모 버전)</p>
+            <p class="text-gray-600 mt-2">원하는 강의를 신청하고, 학사일정을 확인해보세요.</p>
+            <button id="open-calendar-modal" class="mt-4 px-6 py-2 bg-teal-500 text-white font-semibold rounded-lg shadow-md hover:bg-teal-600 transition-colors">
+                학사일정 보기
+            </button>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <!-- 1. 개설 강좌 목록 -->
             <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg">
                 <h2 class="text-2xl font-bold mb-4 border-b pb-2">개설 강좌 목록</h2>
-                <div id="course-list" class="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                    <!-- 자바스크립트로 강의 목록이 여기에 렌더링됩니다. -->
-                </div>
+                <div id="course-list" class="space-y-4 max-h-[60vh] overflow-y-auto pr-2"></div>
             </div>
 
             <!-- 2. 수강 바구니 및 신청 내역 -->
             <div class="space-y-8">
-                <!-- 수강 바구니 -->
                 <div class="bg-white p-6 rounded-xl shadow-lg">
                     <h2 class="text-2xl font-bold mb-4 border-b pb-2">수강 바구니</h2>
-                    <div id="cart-list" class="space-y-3 mb-4 min-h-[100px]">
-                        <!-- 자바스크립트로 장바구니 목록이 여기에 렌더링됩니다. -->
-                    </div>
+                    <div id="cart-list" class="space-y-3 mb-4 min-h-[100px]"></div>
                     <button id="register-button" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400">
                         선택한 과목 일괄 신청
                     </button>
                 </div>
-
-                <!-- 나의 수강 내역 -->
                 <div class="bg-white p-6 rounded-xl shadow-lg">
                     <h2 class="text-2xl font-bold mb-4 border-b pb-2">나의 수강 내역</h2>
-                    <div id="registered-list" class="space-y-3 min-h-[100px]">
-                         <!-- 자바스크립트로 신청 완료 목록이 여기에 렌더링됩니다. -->
-                    </div>
+                    <div id="registered-list" class="space-y-3 min-h-[100px]"></div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- 토스트 메시지 -->
-    <div id="toast" class="toast fixed bottom-5 right-5 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-xl">
+    <div id="toast" class="opacity-0 transition-opacity duration-500 fixed bottom-5 right-5 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-xl">
         <p id="toast-message"></p>
+    </div>
+
+    <!-- 학사일정 달력 모달 -->
+    <div id="calendar-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+        <!-- 오버레이 -->
+        <div class="modal-overlay fixed inset-0 bg-black bg-opacity-50" id="close-calendar-modal-overlay"></div>
+        
+        <!-- 모달 컨텐츠 -->
+        <div class="modal-container w-full max-w-2xl bg-white rounded-2xl shadow-lg p-6 md:p-8 z-10">
+            <div class="flex items-center justify-between mb-6">
+                <h1 class="text-2xl md:text-3xl font-bold text-gray-800" id="month-year"></h1>
+                <div class="flex items-center space-x-2">
+                    <button id="prev-month" class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">&lt;</button>
+                    <button id="next-month" class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">&gt;</button>
+                    <button id="close-calendar-modal-btn" class="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">&times;</button>
+                </div>
+            </div>
+            <div class="calendar-container">
+                <div class="calendar-grid text-center font-semibold text-gray-600 mb-2">
+                    <div class="text-red-500">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="text-blue-500">토</div>
+                </div>
+                <div id="calendar-dates" class="calendar-grid gap-1"></div>
+            </div>
+            <div class="mt-6 pt-4 border-t">
+                 <h3 class="font-bold text-lg mb-2">주요 학사일정</h3>
+                 <div id="event-legend" class="space-y-2 text-sm"></div>
+            </div>
+        </div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- 데이터 (실제로는 서버에서 가져옴) ---
+            // =================================================================
+            // 수강신청 앱 로직
+            // =================================================================
             const initialCourses = [
                 { id: 1, name: '웹 프로그래밍 기초', professor: '김현수', time: '월 1-2교시', capacity: 30, enrolled: 28, credits: 3 },
                 { id: 2, name: '자료구조와 알고리즘', professor: '이영희', time: '화 3-4교시', capacity: 25, enrolled: 10, credits: 3 },
@@ -99,12 +120,10 @@
                 { id: 7, name: '객체지향 프로그래밍', professor: '강민준', time: '월 5-6교시', capacity: 30, enrolled: 15, credits: 3 },
             ];
 
-            // --- 상태 변수 ---
-            let courses = JSON.parse(JSON.stringify(initialCourses)); // 원본 데이터 수정을 위한 깊은 복사
+            let courses = JSON.parse(JSON.stringify(initialCourses));
             let cart = [];
             let registeredCourses = [];
 
-            // --- DOM 요소 ---
             const courseListEl = document.getElementById('course-list');
             const cartListEl = document.getElementById('cart-list');
             const registeredListEl = document.getElementById('registered-list');
@@ -112,9 +131,6 @@
             const toastEl = document.getElementById('toast');
             const toastMessageEl = document.getElementById('toast-message');
 
-            // --- 렌더링 함수 ---
-
-            // 1. 개설 강좌 목록 렌더링
             const renderCourses = () => {
                 courseListEl.innerHTML = '';
                 courses.forEach(course => {
@@ -123,135 +139,72 @@
                     const isRegistered = registeredCourses.some(item => item.id === course.id);
                     
                     let buttonHtml;
-                    if (isRegistered) {
-                        buttonHtml = `<button class="w-full sm:w-auto px-4 py-2 rounded-md bg-green-600 text-white text-sm font-semibold" disabled>신청 완료</button>`;
-                    } else if (isFull) {
-                        buttonHtml = `<button class="w-full sm:w-auto px-4 py-2 rounded-md bg-red-500 text-white text-sm font-semibold" disabled>정원 초과</button>`;
-                    } else if (isInCart) {
-                        buttonHtml = `<button class="w-full sm:w-auto px-4 py-2 rounded-md bg-gray-400 text-white text-sm font-semibold" disabled>바구니에 있음</button>`;
-                    } else {
-                        buttonHtml = `<button onclick="addToCart(${course.id})" class="w-full sm:w-auto px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition">바구니 담기</button>`;
-                    }
+                    if (isRegistered) buttonHtml = `<button class="w-full sm:w-auto px-4 py-2 rounded-md bg-green-600 text-white text-sm font-semibold" disabled>신청 완료</button>`;
+                    else if (isFull) buttonHtml = `<button class="w-full sm:w-auto px-4 py-2 rounded-md bg-red-500 text-white text-sm font-semibold" disabled>정원 초과</button>`;
+                    else if (isInCart) buttonHtml = `<button class="w-full sm:w-auto px-4 py-2 rounded-md bg-gray-400 text-white text-sm font-semibold" disabled>바구니에 있음</button>`;
+                    else buttonHtml = `<button onclick="addToCart(${course.id})" class="w-full sm:w-auto px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition">바구니 담기</button>`;
 
-                    const courseCard = `
+                    courseListEl.innerHTML += `
                         <div class="border p-4 rounded-lg shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${isFull ? 'bg-red-50' : ''}">
                             <div>
                                 <h3 class="font-bold text-lg">${course.name} <span class="text-sm font-medium text-gray-600">(${course.credits}학점)</span></h3>
                                 <p class="text-sm text-gray-600">담당교수: ${course.professor} | 시간: ${course.time}</p>
-                                <p class="text-sm font-semibold mt-1">
-                                    신청 현황: <span class="${isFull ? 'text-red-600' : 'text-blue-600'}">${course.enrolled} / ${course.capacity}</span>
-                                </p>
+                                <p class="text-sm font-semibold mt-1">신청 현황: <span class="${isFull ? 'text-red-600' : 'text-blue-600'}">${course.enrolled} / ${course.capacity}</span></p>
                             </div>
-                            <div class="w-full sm:w-auto flex-shrink-0">
-                                ${buttonHtml}
-                            </div>
-                        </div>
-                    `;
-                    courseListEl.innerHTML += courseCard;
+                            <div class="w-full sm:w-auto flex-shrink-0">${buttonHtml}</div>
+                        </div>`;
                 });
             };
 
-            // 2. 수강 바구니 렌더링
             const renderCart = () => {
-                cartListEl.innerHTML = '';
-                if (cart.length === 0) {
-                    cartListEl.innerHTML = '<p class="text-center text-gray-500 py-4">담은 강의가 없습니다.</p>';
-                    registerButton.disabled = true;
-                } else {
-                    cart.forEach(course => {
-                        const cartItem = `
-                            <div class="flex justify-between items-center bg-gray-100 p-2 rounded-md">
-                                <div>
-                                    <p class="font-semibold">${course.name}</p>
-                                    <p class="text-xs text-gray-500">${course.time}</p>
-                                </div>
-                                <button onclick="removeFromCart(${course.id})" class="text-red-500 hover:text-red-700 font-bold text-lg">&times;</button>
-                            </div>
-                        `;
-                        cartListEl.innerHTML += cartItem;
-                    });
-                    registerButton.disabled = false;
-                }
+                cartListEl.innerHTML = cart.length === 0 ? '<p class="text-center text-gray-500 py-4">담은 강의가 없습니다.</p>' : '';
+                registerButton.disabled = cart.length === 0;
+                cart.forEach(course => {
+                    cartListEl.innerHTML += `
+                        <div class="flex justify-between items-center bg-gray-100 p-2 rounded-md">
+                            <div><p class="font-semibold">${course.name}</p><p class="text-xs text-gray-500">${course.time}</p></div>
+                            <button onclick="removeFromCart(${course.id})" class="text-red-500 hover:text-red-700 font-bold text-lg">&times;</button>
+                        </div>`;
+                });
             };
             
-            // 3. 나의 수강 내역 렌더링
             const renderRegistered = () => {
-                registeredListEl.innerHTML = '';
-                 if (registeredCourses.length === 0) {
-                    registeredListEl.innerHTML = '<p class="text-center text-gray-500 py-4">신청한 강의가 없습니다.</p>';
-                } else {
-                    registeredCourses.forEach(course => {
-                        const registeredItem = `
-                            <div class="bg-green-100 p-3 rounded-md">
-                                <p class="font-semibold text-green-800">${course.name}</p>
-                                <p class="text-xs text-green-700">${course.professor} / ${course.time}</p>
-                            </div>
-                        `;
-                        registeredListEl.innerHTML += registeredItem;
-                    });
-                }
-            }
-
-            // --- 이벤트 핸들러 및 로직 ---
-
-            // 토스트 메시지 표시
-            const showToast = (message, type = 'success') => {
-                toastMessageEl.textContent = message;
-                toastEl.className = 'toast show fixed bottom-5 right-5 text-white px-6 py-3 rounded-lg shadow-xl'; // Reset classes
-                if (type === 'error') {
-                    toastEl.classList.add('bg-red-600');
-                } else {
-                    toastEl.classList.add('bg-gray-800');
-                }
-                
-                setTimeout(() => {
-                    toastEl.className = toastEl.className.replace('show', '');
-                }, 3000);
+                registeredListEl.innerHTML = registeredCourses.length === 0 ? '<p class="text-center text-gray-500 py-4">신청한 강의가 없습니다.</p>' : '';
+                registeredCourses.forEach(course => {
+                    registeredListEl.innerHTML += `
+                        <div class="bg-green-100 p-3 rounded-md">
+                            <p class="font-semibold text-green-800">${course.name}</p>
+                            <p class="text-xs text-green-700">${course.professor} / ${course.time}</p>
+                        </div>`;
+                });
             };
 
-            // 바구니에 담기
+            const showToast = (message, type = 'success') => {
+                toastMessageEl.textContent = message;
+                toastEl.className = `opacity-100 transition-opacity duration-500 fixed bottom-5 right-5 text-white px-6 py-3 rounded-lg shadow-xl ${type === 'error' ? 'bg-red-600' : 'bg-gray-800'}`;
+                setTimeout(() => { toastEl.classList.add('opacity-0'); }, 3000);
+            };
+
             window.addToCart = (courseId) => {
                 const course = courses.find(c => c.id === courseId);
-                
-                // 시간표 중복 체크
-                const timeConflict = cart.some(item => item.time === course.time);
-                if (timeConflict) {
-                    showToast('선택한 강의와 시간이 겹칩니다.', 'error');
+                if (cart.some(item => item.time === course.time) || registeredCourses.some(item => item.time === course.time)) {
+                    showToast('해당 시간에 다른 강의가 있습니다.', 'error');
                     return;
                 }
-
-                // 등록된 강의와 시간표 중복 체크
-                const registeredTimeConflict = registeredCourses.some(item => item.time === course.time);
-                 if (registeredTimeConflict) {
-                    showToast('이미 신청한 강의와 시간이 겹칩니다.', 'error');
-                    return;
-                }
-
                 cart.push(course);
                 updateAll();
             };
 
-            // 바구니에서 삭제
             window.removeFromCart = (courseId) => {
                 cart = cart.filter(item => item.id !== courseId);
                 updateAll();
             };
 
-            // 수강신청 처리
             registerButton.addEventListener('click', () => {
-                if (cart.length === 0) return;
-
-                let successCount = 0;
-                let failCount = 0;
-                let failedCourses = [];
-
+                let successCount = 0, failCount = 0, failedCourses = [];
                 cart.forEach(cartItem => {
                     const courseInDb = courses.find(c => c.id === cartItem.id);
-                    
-                    // 동시성 문제 시뮬레이션: 10% 확률로 다른 사람이 먼저 신청했다고 가정
-                    const someoneElseWasFaster = Math.random() < 0.1;
-
-                    if (courseInDb.enrolled < courseInDb.capacity && !someoneElseWasFaster) {
+                    if (courseInDb.enrolled < courseInDb.capacity && Math.random() > 0.1) {
                         courseInDb.enrolled++;
                         registeredCourses.push(courseInDb);
                         successCount++;
@@ -260,28 +213,109 @@
                         failedCourses.push(courseInDb.name);
                     }
                 });
-
-                cart = []; // 바구니 비우기
-                
-                if (failCount > 0) {
-                     showToast(`${failedCourses.join(', ')} 신청 실패 (정원 초과 또는 동시 신청).`, 'error');
-                }
-                if (successCount > 0) {
-                    showToast(`${successCount}개 강의 신청 성공!`, 'success');
-                }
-
+                cart = [];
+                if (failCount > 0) showToast(`${failedCourses.join(', ')} 신청 실패.`, 'error');
+                if (successCount > 0) showToast(`${successCount}개 강의 신청 성공!`, 'success');
                 updateAll();
             });
 
-            // --- 초기화 및 전체 업데이트 ---
             const updateAll = () => {
                 renderCourses();
                 renderCart();
                 renderRegistered();
             };
-
-            // 앱 시작
+            
             updateAll();
+
+            // =================================================================
+            // 학사일정 달력 로직
+            // =================================================================
+            const calendarModal = document.getElementById('calendar-modal');
+            const openCalendarBtn = document.getElementById('open-calendar-modal');
+            const closeCalendarBtn = document.getElementById('close-calendar-modal-btn');
+            const closeCalendarOverlay = document.getElementById('close-calendar-modal-overlay');
+
+            const monthYearEl = document.getElementById('month-year');
+            const calendarDatesEl = document.getElementById('calendar-dates');
+            const eventLegendEl = document.getElementById('event-legend');
+            const prevMonthBtn = document.getElementById('prev-month');
+            const nextMonthBtn = document.getElementById('next-month');
+
+            const events = {
+                '2025-07-28': { title: '1차 수강신청', color: 'bg-blue-500' },
+                '2025-08-04': { title: '2차 수강신청', color: 'bg-blue-500' },
+                '2025-08-18': { title: '수강신청 정정 기간', color: 'bg-green-500' },
+                '2025-08-22': { title: '수강신청 정정 마감', color: 'bg-green-500' },
+                '2025-09-01': { title: '2학기 개강', color: 'bg-yellow-500' }
+            };
+
+            let calendarDate = new Date(2025, 6, 15);
+
+            const renderCalendar = () => {
+                const year = calendarDate.getFullYear();
+                const month = calendarDate.getMonth();
+                monthYearEl.textContent = `${year}년 ${month + 1}월`;
+                calendarDatesEl.innerHTML = '';
+                eventLegendEl.innerHTML = '<p class="text-gray-500">해당 월에 학사일정이 없습니다.</p>';
+
+                const firstDay = new Date(year, month, 1).getDay();
+                const lastDate = new Date(year, month + 1, 0).getDate();
+                const prevLastDate = new Date(year, month, 0).getDate();
+                let currentMonthEvents = [];
+
+                for (let i = firstDay; i > 0; i--) {
+                    calendarDatesEl.innerHTML += `<div class="calendar-day text-gray-300 p-2 text-center">${prevLastDate - i + 1}</div>`;
+                }
+
+                for (let i = 1; i <= lastDate; i++) {
+                    const today = new Date();
+                    const isToday = i === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    const event = events[dateStr];
+                    
+                    let dayHtml = `<div class="calendar-day p-2 text-center rounded-lg transition-colors cursor-pointer hover:bg-gray-100 relative">`;
+                    if (isToday) dayHtml += `<span class="bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center mx-auto">${i}</span>`;
+                    else dayHtml += `<span>${i}</span>`;
+                    if (event) {
+                        dayHtml += `<div class="absolute bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 ${event.color} rounded-full"></div>`;
+                        currentMonthEvents.push({ date: i, ...event });
+                    }
+                    dayHtml += `</div>`;
+                    calendarDatesEl.innerHTML += dayHtml;
+                }
+                
+                const totalDays = calendarDatesEl.children.length;
+                for (let i = 1; i <= (7 - (totalDays % 7)) % 7; i++) {
+                    calendarDatesEl.innerHTML += `<div class="calendar-day text-gray-300 p-2 text-center">${i}</div>`;
+                }
+
+                if (currentMonthEvents.length > 0) {
+                    eventLegendEl.innerHTML = '';
+                    currentMonthEvents.sort((a, b) => a.date - b.date).forEach(event => {
+                        eventLegendEl.innerHTML += `<div class="flex items-center"><span class="w-3 h-3 ${event.color} rounded-full mr-3"></span><span>${year}.${month + 1}.${event.date}: ${event.title}</span></div>`;
+                    });
+                }
+            };
+
+            const toggleModal = (show) => {
+                calendarModal.classList.toggle('hidden', !show);
+            };
+
+            openCalendarBtn.addEventListener('click', () => toggleModal(true));
+            closeCalendarBtn.addEventListener('click', () => toggleModal(false));
+            closeCalendarOverlay.addEventListener('click', () => toggleModal(false));
+            
+            prevMonthBtn.addEventListener('click', () => {
+                calendarDate.setMonth(calendarDate.getMonth() - 1);
+                renderCalendar();
+            });
+
+            nextMonthBtn.addEventListener('click', () => {
+                calendarDate.setMonth(calendarDate.getMonth() + 1);
+                renderCalendar();
+            });
+
+            renderCalendar();
         });
     </script>
 </body>
